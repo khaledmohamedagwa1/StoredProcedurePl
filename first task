@@ -1,0 +1,226 @@
+create sequence autoIncrementByOne
+start  with 1 
+increment by 1;
+
+create table programs
+(
+id number default autoIncrementByOne.nextval,
+en_name varchar2(100) ,
+ar_name nvarchar2(100),
+isActive number(1,0),
+    constraint pk primary key (id)
+)
+INSERT INTO programs ( en_name, isActive, ar_name)
+VALUES ( 'English Program 1', 1, N'برنامج عربي 1');
+
+INSERT INTO programs ( en_name, isActive, ar_name)
+VALUES ( 'English Program 2', 0, N'برنامج عربي 2');
+
+INSERT INTO programs ( en_name, isActive, ar_name)
+VALUES ( 'English Program 3', 1, N'برنامج عربي 3');
+
+select * from programs order by id
+
+
+create or replace procedure GetAllPrograms (cur out sys_refcursor)
+is 
+begin
+open cur for 
+select * from Programs ;
+end GetAllPrograms;
+
+
+DECLARE
+    program_cursor SYS_REFCURSOR;
+    program_record Programs%ROWTYPE; -- Declare a record type to match the table structure
+BEGIN
+    GetAllPrograms(program_cursor);
+
+    LOOP
+        FETCH program_cursor INTO program_record;
+        EXIT WHEN program_cursor%NOTFOUND;
+        
+        DBMS_OUTPUT.PUT_LINE('ID: ' || program_record.id || ', Name: ' || program_record.en_name || ', IsActive: ' || program_record.isActive || ', Arabic Name: ' || program_record.ar_name);
+    END LOOP;
+    CLOSE program_cursor;
+END;
+/
+
+CREATE OR REPLACE PROCEDURE GetProgramById(p_id NUMBER, program OUT SYS_REFCURSOR)
+IS
+BEGIN
+    OPEN program FOR
+    SELECT * FROM Programs WHERE id = p_id;
+END GetProgramById;
+
+
+declare 
+id number := 10 ;
+program sys_refcursor ;
+program_record Programs%rowtype;
+begin 
+getProgramById(id,program);
+loop 
+fetch program into program_record ;
+exit when (program%notfound);
+DBMS_OUTPUT.PUT_LINE('ID: ' || program_record.id || ', Name: ' || program_record.en_name || ', IsActive: ' || program_record.isActive || ', Arabic Name: ' || program_record.ar_name);
+End Loop;
+end;
+
+DECLARE
+    id NUMBER := 10;
+    program SYS_REFCURSOR;
+    program_record Programs%ROWTYPE;
+BEGIN
+    GetProgramById(id, program);
+
+    LOOP
+        FETCH program INTO program_record;
+        EXIT WHEN program%NOTFOUND;
+
+        DBMS_OUTPUT.PUT_LINE('ID: ' || program_record.id || ', Name: ' || program_record.en_name || ', IsActive: ' || program_record.isActive || ', Arabic Name: ' || program_record.ar_name);
+    END LOOP;
+    CLOSE program;
+END;
+
+
+CREATE OR REPLACE PROCEDURE GetByArName(arName NVARCHAR2, cur OUT SYS_REFCURSOR)
+IS
+BEGIN
+    OPEN cur FOR 
+    SELECT * FROM programs WHERE ar_name LIKE '%' || arName || '%';
+END GetByArName;
+
+DECLARE
+    arabic NVARCHAR2(100) := N'برنامج عربي 1';
+    curso SYS_REFCURSOR;
+    reco programs%ROWTYPE;
+BEGIN
+    GetByArName(arabic, curso);
+    LOOP
+        FETCH curso INTO reco;
+        EXIT WHEN curso%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('ID: ' || reco.id || ', Name: ' || reco.en_name || ', IsActive: ' || reco.isActive || ', Arabic Name: ' || reco.ar_name);
+    END LOOP;
+    CLOSE curso;
+END;
+
+
+CREATE OR REPLACE PROCEDURE GetByEnName(enName VARCHAR2, cur OUT SYS_REFCURSOR)
+IS
+BEGIN
+    OPEN cur FOR 
+    SELECT * FROM programs WHERE En_name LIKE '%' || enName || '%';
+END GetByEnName;
+
+DECLARE
+    english VARCHAR2(100) := 'English Program 2';
+    curso SYS_REFCURSOR;
+    reco programs%ROWTYPE;
+BEGIN
+    GetByEnName(english, curso);
+    LOOP
+        FETCH curso INTO reco;
+        EXIT WHEN curso%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('ID: ' || reco.id || ', Name: ' || reco.en_name || ', IsActive: ' || reco.isActive || ', Arabic Name: ' || reco.ar_name);
+    END LOOP;
+    CLOSE curso;
+END;
+
+CREATE OR REPLACE PROCEDURE InsertProgram(
+    p_en_name VARCHAR2,
+    p_ar_name NVARCHAR2,
+    p_isActive NUMBER,
+    p_result OUT NUMBER
+)
+IS
+BEGIN
+    INSERT INTO Programs (en_name, ar_name, isActive)
+    VALUES (p_en_name, p_ar_name, p_isActive);
+    COMMIT;
+    p_result := 1; 
+EXCEPTION
+    WHEN OTHERS THEN
+        p_result := 0;
+END InsertProgram;
+
+DECLARE
+    result NUMBER;
+BEGIN    
+    InsertProgram('Sample English Name',  N'عربي',1, result); 
+    DBMS_OUTPUT.PUT_LINE('Result: ' || result);
+END;
+
+
+
+CREATE OR REPLACE PROCEDURE DeleteProgramById(
+    p_id NUMBER,
+    p_result OUT NUMBER
+)
+IS
+BEGIN
+    DELETE FROM Programs
+    WHERE id = p_id;
+
+    COMMIT;
+
+    IF SQL%ROWCOUNT = 1 THEN
+        p_result := 1;
+    ELSE
+        p_result := 0;
+    END IF;
+END DeleteProgramById;
+
+DECLARE
+    result NUMBER;
+BEGIN
+    DeleteProgramById(6, result);
+
+    DBMS_OUTPUT.PUT_LINE('Result: ' || result);
+END;
+
+
+CREATE OR REPLACE PROCEDURE UpdateProgramById(
+    p_id NUMBER,
+    p_en_name VARCHAR2,
+    p_ar_name NVARCHAR2,
+    p_isActive NUMBER,
+    p_result OUT NUMBER
+)
+IS
+BEGIN
+    UPDATE Programs
+    SET en_name = p_en_name,
+        ar_name = p_ar_name,
+        isActive = p_isActive
+    WHERE id = p_id;
+
+    COMMIT;
+
+    IF SQL%ROWCOUNT = 1 THEN
+        p_result := 1;
+    ELSE
+        p_result := 0;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        p_result := 0;
+END UpdateProgramById;
+
+DECLARE
+    result NUMBER;
+BEGIN
+    UpdateProgramById(10, 'Updated English Name', N'تم تحديثه', 1, result);
+	DBMS_OUTPUT.PUT_LINE('Result: ' || result);
+END;
+select * from programs
+
+
+
+
+
+
+
+
+
+
