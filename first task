@@ -1,3 +1,39 @@
+CREATE OR REPLACE PROCEDURE search_with_pagination (
+  p_page_index IN NUMBER,
+  p_items_per_page IN NUMBER,
+  p_arabic_search IN VARCHAR2,
+  p_english_search IN VARCHAR2,
+  p_order_column IN VARCHAR2,
+  p_order_type IN VARCHAR2,
+  p_result_cursor OUT SYS_REFCURSOR,
+  p_total_count OUT NUMBER
+) AS
+BEGIN
+  -- Count the total number of rows that match the search criteria
+  SELECT COUNT(*)
+  INTO p_total_count
+  FROM your_table
+  WHERE 
+    (p_arabic_search <> '''' AND arname LIKE '%' || p_arabic_search || '%') 
+    OR 
+    (p_english_search <> '''' AND enname LIKE '%' || p_english_search || '%');
+
+  -- Construct the SQL query as a string
+  -- Please note that the variables are directly embedded in the query
+  -- This approach doesn't use the USING clause
+  OPEN p_result_cursor FOR
+    'SELECT ID, arname, enname, isactive
+    FROM your_table
+    WHERE 
+      (p_arabic_search <> '''' AND arname LIKE ''%' || p_arabic_search || '%'') 
+      OR 
+      (p_english_search <> '''' AND enname LIKE ''%' || p_english_search || '%'')
+    ORDER BY ' || p_order_column || ' ' || p_order_type || '
+    OFFSET ' || ((p_page_index - 1) * p_items_per_page) || ' ROWS
+    FETCH NEXT ' || p_items_per_page || ' ROWS ONLY';
+END search_with_pagination;
+/
+
 create sequence autoIncrementByOne
 start  with 1 
 increment by 1;
