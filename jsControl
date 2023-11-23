@@ -1,0 +1,270 @@
+
+//take the div id
+var dropDownObject1 = {
+    //element id can be a string literal value or a function return an html element
+    Element: "",
+    // title can be  a string literal value or function that return a string value to reperesent the title
+    Title: "",
+    // the item can be array of objects or function that return array of object in the next format
+    // [
+    //     {
+    //         Name :"" ,
+    //         Value :"" ,
+    // ParentValue:""
+    //         Children :[
+    //             {
+    //                 name:"",
+    //                 value:"" ,
+    // ParentValue:""
+
+    //             }
+    //         ]
+    //     }
+    // ]
+    Items :[] ,
+    //the drop down type "Normal" Or "Fixed" The Value Can Be Function Return The Type String Value
+    // the default value for the type is "normal" if it is not declared or have invalid value
+    Type: "Normal",
+    //Is Single Select Can Be A Boolean Value Or Function Return A Boolean Value
+    //the default value for the is single select feature is true
+    IsSingleSelect: Boolean,
+    //the default value for the is collapsed view is false
+    IsCollapsed: Boolean ,
+    //the default value for the is searchable feature is false
+    IsSearchable: Boolean,
+    DefaultValue:"-1" ,
+    //style Object
+};
+
+//1 - Validate And Get The Object
+//2 - Draw The Object
+
+
+
+
+function createDropDown(dropDownObject)
+{
+    let obj = getDropDownObj(dropDownObject);
+    if(obj == null) return null;
+    RenderDropDown(obj);
+}
+
+function RenderDropDown(dropDownObject)
+{
+
+    let {Element ,Title ,Items ,Type ,IsSingleSelect,IsCollapsed ,IsSearchable ,DefaultValue} = getDropDownObj(dropDownObject) ;
+    let titlePargraph = document.createElement("span");
+    titlePargraph.innerText = Title;
+    Element.appendChild(titlePargraph);
+    Element.setAttribute("value" ,DefaultValue);
+    Element.style.width ="400px" ;
+    Element.style.border ="2px solid black";
+    Element.style.paddingBlock ="15px";
+    let ul =(Type =="Normal") ? createNormalDropDown(Items,Element ,titlePargraph) : createFixedDropDown(Items,Element,titlePargraph);
+    //in the first to make multiple select must override the div on click event to stop when i click on the items and to 
+    // (IsSingleSelect)?   bindSingleSelectEventToMenu(ul,Element,titlePargraph) :bindMultipleSelectEventToElement(ul);
+    if(!IsSingleSelect)
+    {
+        AddCheckBoxesToMenuItems(ul,Element);
+    }
+    // (IsSingleSelect)? bindSingleSelectEventToMenu(ul,Element,titlePargraph): bindMultiSelectEventToMenu(ul,Element)
+  
+    Element.appendChild(ul);
+
+}
+
+
+
+function bindMultiSelectEventToMenu(ul,dropDownElement,titlePargraph)
+{
+    let lis = ul.getElementsByTagName("li");
+    for(index in lis)
+    {
+        //if the user click on the any item will check the check box state if it is enabled or disable 
+        //if it is enable will add it is value to the array else check if it exist and then remove
+        bindMultiSelectEventToMenu(lis[index]);
+    }
+    dropDownElement.onclick = function(e){
+        // dropDownElement.getAttribute("value")
+        //in this event when the user click on the drop down element we will dispear the drop down only in this situaton
+        ul.style.display ="none";
+     }
+}
+
+function AddCheckBoxesToMenuItems(ul,dropDownElement)
+{
+    let lis = ul.getElementsByTagName("li");
+    for (let index = 0; index < lis.length; index++) {
+        console.log(lis[index]);
+        let checkBox = document.createElement("input");
+        checkBox.type ="checkbox";
+        checkBox.value =lis[index].getAttribute("value"); 
+        lis[index].appendChild(checkBox);
+        lis[index].onclick = function(e){
+            //get the current values in the dropDown element
+            let oldSelectedValues = JSON.parse(dropDownElement.getAttribute("value"));
+            console.log(oldSelectedValues);
+            //before pusing the value we must check in the array if element exist if it is exist remove it and uncheck the checkbox
+            console.log(lis[index].getAttribute("value"));
+            console.log(oldSelectedValues.includes(lis[index].getAttribute("value")));
+            if(oldSelectedValues.includes(lis[index].getAttribute("value")))
+            {
+                let newValues = oldSelectedValues.filter(value == lis[index].getAttribute("value"));
+                console.log(newValues);
+                dropDownElement.setAttribute("value" ,JSON.stringify(newValues));
+                console.log(JSON.parse(dropDownElement.getAttribute("value")))
+            }
+            else
+            {
+                oldSelectedValues.push(lis[index].getAttribute("value"));
+                console.log(JSON.parse(dropDownElement.getAttribute("value")))
+
+            }
+        
+            //set attribute 
+
+            // oldSelectedValues.forEach(element => {
+            //     console.log(element);
+            //     // if(e.target.value != element)
+            //     // {
+            //     //     selectedValues.push(e.target.value);
+            //     //     dropDownElement.setAttribute("value",selectedValues);
+            //     // }    
+            // }); 
+
+            //check if the value in the drop down if it is in check the check boix
+            //if the value not in the drop down add it to the drop down values and check the check box
+            //if the user check the check box 
+            // console.log(e.target.getAttribute("value"));
+            //take the value from the input and add it to the dropdownelement value
+            
+        }
+    }
+}
+function AddCheckBoxForItem(li)
+{
+ 
+    let checkBox =document.createElement("input");
+    checkBox.type ="checkbox";
+    // checkBox.value =li.getAttribute("id");
+    li.appendChild(checkBox);
+    // li.appendChild(checkBox);
+}
+function bindSingleSelectEventToMenu(ul,dropDownElement,titlePargraph)
+{
+    let lis = ul.getElementsByTagName("li");
+    dropDownElement.onclick= function(e)
+    {
+        if(e.target == this)
+        {
+            UpdateDropDownUi(ul);
+        }
+    }
+    for( index in lis)
+    {
+        bindSingleSelectEventToItem(lis[index],ul,dropDownElement,titlePargraph,ul);
+    }
+}
+function bindSingleSelectEventToItem(li ,ul,dropDownElement,titlePargraph)
+{
+    li.onclick = function(e){
+        dropDownElement.setAttribute("value",e.target.getAttribute("value"));
+        titlePargraph.innerText = e.target.innerText;
+        UpdateDropDownUi(ul);
+    }
+}
+function UpdateDropDownUi(ul){
+    ul.style.display = (ul.style.display =="none") ?"block" :"none";
+}
+function createNormalDropDown(items,dropDownElement,titleElement){
+    let ul = createMenu();
+    ul.style.display ="none";
+    items.forEach(item => {
+            ul.appendChild(createDropDownItem(item,dropDownElement ,titleElement));
+    });
+ 
+    return ul;
+}
+
+function createDropDownItem(itemObj,element )
+{
+    let li = document.createElement("li");
+    li.setAttribute("value" ,`${itemObj.Value}`);
+    let span = document.createElement("span");
+    span.innerText = itemObj.Name;
+    li.appendChild(span);
+    li.setAttribute("id",`${element.id}-${itemObj.Value}`);
+    li.setAttribute("isParent" ,(itemObj.Children.length >0) );
+    li.setAttribute("parentValue" ,itemObj.ParentValue );
+  return li;
+}
+function createFixedDropDown(items , dropDownElement , titleElement)
+{
+  let ul = createMenu();
+  items.forEach(item => {ul.appendChild(createDropDownItem(item,dropDownElement));});
+return ul;
+}
+function createMenu(){
+    let ul = document.createElement("ul");
+    ul.style.borderTop ="1px solid black";
+    ul.style.margin ="0px";
+    ul.style.listStyle="none inside";
+    ul.style.padding ="0px";
+    ul.style.maxHeight ="100px";
+    ul.style.overflowY  = "auto";
+    return ul;
+}
+function getDropDownObj(dropDownObject){
+    let evaluatedObj = null;
+    if(isNotUndefinedOrNull(dropDownObject))
+    {
+        let Element = isStringValue(dropDownObject.Element) ? document.getElementById(dropDownObject.Element) : (IsFunction(dropDownObject.Element) ?dropDownObject.Element():null) ;
+        let Title = isNotEmptyString(dropDownObject.Title) ? dropDownObject.Title : IsFunction(dropDownObject.Title)?dropDownObject.Element():null;
+        let Items= isObjectArray(dropDownObject.Items)? dropDownObject.Items : IsFunction(dropDownObject.Items) ? isObjectArray(dropDownObject.Items())?dropDownObject.Items():null:null;
+        let Type = isStringValue(dropDownObject.Type)? (dropDownObject.Type == "Normal" || dropDownObject.Type =="Fixed")?dropDownObject.Type :"Normal":IsFunction(dropDownObject.Type)? (dropDownObject.Type() == "Normal" || dropDownObject.Type() =="Fixed")?dropDownObject.Type():"Normal":"Normal";
+        let IsSingleSelect = isBooleanValue(dropDownObject.IsSingleSelect) ?dropDownObject.IsSingleSelect :IsFunction(dropDownObject.IsSingleSelect)?isBooleanValue(dropDownObject.IsSingleSelect())?dropDownObject.IsSingleSelect():true:true;
+        let IsCollapsed = isBooleanValue(dropDownObject.IsCollapsed) ?dropDownObject.IsCollapsed :IsFunction(dropDownObject.IsCollapsed)?isBooleanValue(dropDownObject.IsCollapsed())?dropDownObject.IsCollapsed():false:false;
+        let IsSearchable = isBooleanValue(dropDownObject.IsSearchable) ?dropDownObject.IsSearchable :IsFunction(dropDownObject.IsSearchable)?isBooleanValue(dropDownObject.IsSearchable())?dropDownObject.IsSearchable():false:false;
+        let DefaultValue = (IsSingleSelect) ? "-1" :"[]";
+        
+        evaluatedObj = {
+            Element : Element ,
+            Title :Title ,
+            Items :Items ,
+            Type :Type ,
+            IsSingleSelect :IsSingleSelect ,
+            IsCollapsed :IsCollapsed ,
+            IsSearchable :IsSearchable  ,
+            DefaultValue :DefaultValue
+        }
+
+    }
+    return evaluatedObj ;
+}
+function IsFunction(obj)
+{
+    return isNotUndefinedOrNull(obj) && obj.constructor == Function ;
+}
+function isNotEmptyString (obj)
+{
+    return isNotUndefinedOrNull(obj) && obj.trim().length !=0;
+}
+function isStringValue(obj){
+    return isNotUndefinedOrNull(obj) && obj.constructor == String;
+}
+function isNotUndefinedOrNull(obj)
+{
+    return obj != undefined && obj != null ? true :false;
+}
+function isObject(obj)
+{
+    return isNotUndefinedOrNull(obj) // && obj.constructor == Object ;
+}
+function isObjectArray(obj)
+{
+    return isObject(obj)// && Array.isArray(obj);
+}
+function isBooleanValue(obj)
+{
+    return isNotUndefinedOrNull(obj) && obj.constructor == Boolean;
+}
