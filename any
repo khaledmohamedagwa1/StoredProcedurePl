@@ -1,0 +1,534 @@
+function getDropDownObj(obj) {
+    let { Element, Title, MenuStyle, SubMenuStyle, Type, IsSingleSelect, IsCollapsed, IsSearchable, IsSelectAll, Url, ParentValueColumn, ParentNameColumn, ChildValueColumn, ChildNameColumn} = obj;
+    let dropDownElement = document.getElementById(Element);
+    dropDownElement.style.width = "400px";
+    dropDownElement.setAttribute("value", IsSingleSelect ? '-1' : '[]');
+    let spanTitle = createTitleSpan(Element, Title);
+    return {
+        Element: dropDownElement,
+        Title: spanTitle,
+        IsSingleSelect: IsSingleSelect ?? true,
+        IsCollapsed: IsCollapsed ?? true,
+        IsSearchable: IsSearchable ,
+        Type: Type ?? "Normal",
+        MenuStyle: MenuStyle ?? getStandardMenuStyle(),
+        SubMenuStyle: SubMenuStyle ?? getStandardMenuStyle(),
+/*        SearchElement: IsSearchable ? searchInputComponent(Element) : null,*/
+        IsSelectAll: IsSelectAll && !IsSingleSelect ? true : false,
+        Url: Url,
+        ParentValueColumn: ParentValueColumn,
+        ParentNameColumn: ParentNameColumn,
+        ChildValueColumn: ChildValueColumn,
+        ChildNameColumn: ChildNameColumn,
+
+    }
+
+}
+function createMenu(items, element, title, isSingleSelect, IsCollapsed, IsSelectAll) {
+    let ul = document.createElement("ul");
+    items.forEach(item => {
+        let li = createMeunItem(item, element, isSingleSelect, IsCollapsed);
+        ul.appendChild(li);
+        if (isSingleSelect) {
+            singleSelectBehavior(ul, ul, element, title)
+        }
+        if (!isSingleSelect && IsCollapsed) {
+            let subMenu = createMenu(item.Children, element, title, isSingleSelect, IsCollapsed, null);
+            let parentCheckBox = li.getElementsByTagName("input")[0];
+            let subCheckBoxes = [...subMenu.getElementsByTagName("input")];
+            collapsingBehavior(li, subMenu);
+            multiSelectBehavior(element, parentCheckBox, subCheckBoxes);
+        li.appendChild(subMenu);
+            return ul;
+        }
+        if (!isSingleSelect && !IsCollapsed) {
+            let subMenu = createMenu(item.Children, element, title, isSingleSelect, IsCollapsed, null);
+
+            let parentCheckBox = li.getElementsByTagName("input")[0];
+            let subCheckBoxes = [...subMenu.getElementsByTagName("input")];
+            collapsingBehavior(li, subMenu);
+            multiSelectBehavior(element, parentCheckBox, subCheckBoxes);
+        }
+        if (IsCollapsed) {
+            let subMenu = createMenu(item.Children, element, title, isSingleSelect, IsCollapsed, null);
+            collapsingBehavior(li, subMenu);
+            li.appendChild(subMenu);
+
+        }
+    });
+    return ul;
+}
+
+function GetItems(url, parentValueCol, parentNameCol, childValueCol, childNameCol) {
+    let listOFCountryAndCities = [];
+    ajaxCall.ajaxPOST(url, JSON.stringify({ search: "" }),
+        function (res) {
+            res.forEach(item => {
+                let parent = {
+                    Value: item[parentValueCol],
+                    Name: item[parentNameCol]
+                };
+                parent.Children = [];
+                res.forEach(item => {
+                    if (item[parentValueCol] == parent.Value) {
+                        parent.Children.push({ Value: item[childValueCol], Name: item[childNameCol], Children: [] });
+                    }
+                });
+                if (!listOFCountryAndCities.some(item2 => item2.Value == parent.Value && item2.Name == parent.Name)) {
+                    listOFCountryAndCities.push(parent);
+                }
+            });
+        },
+        function (e) {
+            console.log(e)
+        });
+    return listOFCountryAndCities;
+}
+
+
+function drawDropDown(obj) {
+    let { Element, Title, MenuStyle, SubMenuStyle, IsSearchable, Type, Url, ParentValueColumn, ParentNameColumn, ChildValueColumn, ChildNameColumn, IsSingleSelect, IsCollapsed, IsSelectAll } = getDropDownObj(obj);
+    Element.append(Title);
+    let searchElement;
+    if (IsSearchable) {
+        searchElement = searchInputComponent(Element);
+        Element.appendChild(searchElement);
+    }
+    let items = GetItems(Url, ParentValueColumn, ParentNameColumn, ChildValueColumn, ChildNameColumn);
+    let menu = createMenu(items, Element, Title, IsSingleSelect, IsCollapsed, IsSelectAll);
+    let selectAllElement;
+    if (IsSelectAll) {
+        selectAllElement = selectAllComponent(menu, Element)
+        Element.append(selectAllElement);
+    }
+    Element.append(menu);
+    applyDynamicMenuStyle(MenuStyle || getStandardMenuStyle(), menu);
+    applyDynamicMenuStyle(SubMenuStyle || getStandardMenuStyle(), getMenuSubMenusArray(menu));
+    if (Type == "Normal") {
+        if (IsSearchable) {
+            document.getElementById(`${Element.id}_search`).style.display = "none"
+        }
+        if (IsSelectAll) {
+            document.getElementById(`${Element.id}_selectAll`).style.display = "none"
+        }
+        showOrHiddenElement(menu);
+        dropDownClickEventForSingleSelect(Element, menu);
+    }
+}
+
+function searchInputComponent(element) {
+    let div = document.createElement("div");
+    let searchInput = document.createElement("input");
+    searchInput.type = "text";
+    searchInput.id = `${element.id}_search`;
+    searchInput.Name = "";
+    searchInput.placeholder = "search ";
+    div.appendChild(searchInput);
+    return div;
+}
+function createTitleSpan(element, title) {
+    let titleSpan = document.createElement("span");
+    titleSpan.id = `${element}_title`;
+    titleSpan.innerText = title;
+    return titleSpan;
+}
+function getStandardMenuStyle() {
+    return {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    }
+}
+function applyDynamicMenuStyle(styleObject, ...ul) {
+    ul.forEach((item) => {
+        if (item instanceof HTMLUListElement) {
+            for (let property in styleObject) {
+                item.style[property] = styleObject[property];
+            }
+        }
+    });
+}
+function getMenuSubMenusArray(menu) {
+    return [...menu.getElementsByTagName("ul")];
+}
+function getMenuItems(menu) {
+    return [...menu.getElementsByTagName("li")];
+}
+function showOrHiddenElement(element, hide) {
+    
+    element.style.display = (element.style.display == "none") ? "block" : "none";
+}
+function dropDownClickEventForSingleSelect(element, ul) {
+    element.onclick = function (e) {
+        if (e.target == this || e.target == this.childNodes[0]) {
+            showOrHiddenElement(ul);
+            if (document.getElementById(`${element.id}_search`) != null)
+                showOrHiddenElement(document.getElementById(`${element.id}_search`));
+            if (document.getElementById(`${element.id}_selectAll`) != null)
+                showOrHiddenElement(document.getElementById(`${element.id}_selectAll`));
+        }
+    }
+}
+function createItemCheckBox(item) {
+    let checkBox = document.createElement("input");
+    checkBox.type = "checkbox";
+    checkBox.value = item.Value;
+    if (item.Children.length > 0) {
+        checkBox.setAttribute("isParent", "true")
+    }
+    return checkBox;
+}
+function createCollaspedSpan() {
+    let span = document.createElement("span");
+    span.innerText = "--";
+    return span;
+}
+function createMeunItem(item, element, isSingleSelect, isCollapsed) {
+    let li = document.createElement('li');
+    li.innerText = item.Name;
+    li.setAttribute("value", item.Value)
+    li.id = `${element.id}_${item.Value}`;
+    if (!isSingleSelect) {
+      
+     
+   
+        li.append(createItemCheckBox(item));
+    }
+    if (isCollapsed && item.Children.length > 0) {
+        li.append(createCollaspedSpan());
+        
+    }
+    return li;
+}
+function OnClickCollapsedParent(parentElement, subMenu) {
+    parentElement.onclick = function (e) {
+        if (e.target == this || e.target == this.childNodes[0] || e.target == this.childNodes[1])
+            showOrHiddenElement(subMenu);
+    }
+}
+function onSelectItemSingleSelect(menu, submenu, element) {
+    getMenuItems(submenu).forEach(item => {
+        item.onclick = function (e) {
+            let selectedItem = e.target;
+            if (selectedItem == this) {
+                document.getElementById(`${element.id}_title`).innerText = this.childNodes[0].textContent;
+                if (document.getElementById(`${element.id}_search`) != null)
+                    document.getElementById(`${element.id}_search`).style.display = "none";
+                element.setAttribute("value", selectedItem.getAttribute("value"));
+                showOrHiddenElement(menu);
+            }
+        }
+    })
+}
+function getDropDownValue(element, isSingleSelect) {
+    return isSingleSelect ? element.getAttribute("value") : JSON.parse(element.getAttribute("value"));
+}
+function setDropDownValue(element, value, isSingleSelect) {
+    element.setAttribute("value", JSON.stringify(value));
+}
+function isValueInDropDownValues(value, valuesArray) {
+    return valuesArray.includes(Number(value));
+}
+function onParentCheckBoxChecked(element, subCheckBoxes) {
+    let valuesArray = getDropDownValue(element, false);
+    subCheckBoxes.forEach(item => {
+        item.checked = true;
+        if (!isValueInDropDownValues(item.value, valuesArray))
+            valuesArray.push(Number(item.value));
+    });
+    setDropDownValue(element, valuesArray);
+
+}
+function onParentCheckBoxUnChecked(element, selectedValue, subCheckBoxes) {
+
+    let valuesArray = getDropDownValue(element, false);
+    let newValues=[];
+    subCheckBoxes.forEach(item => {
+        item.checked = false;
+        if (valuesArray.includes(Number(item.value))) {
+            newValues = valuesArray.filter(a => a === item.value);
+        }
+    });
+    setDropDownValue(element, newValues);
+}
+function onChangeParentCheckBox(element, parentCheckBox, subCheckBoxes) {
+    parentCheckBox.onchange = function (e) {
+        let selected = e.target;
+        if (selected.checked)
+            onParentCheckBoxChecked(element, subCheckBoxes);
+        else
+            onParentCheckBoxUnChecked(element, selected.value, subCheckBoxes);
+    }
+}
+function onChildCheckboxChecked(element, selectedValue, parentCheckBox, subCheckBoxes) {
+    let valuesArray = getDropDownValue(element, false);
+    if (!isValueInDropDownValues(selectedValue, valuesArray))
+        valuesArray.push(Number(selectedValue));
+    if (subCheckBoxes.every(a => a.checked)) {
+        parentCheckBox.checked = true;
+    }
+    setDropDownValue(element, valuesArray)
+
+}
+function onChildCheckboxUnchecked(element, selectedValue, parentCheckBox) {
+    let valuesArray = getDropDownValue(element, false);
+    let newValues;
+    if (isValueInDropDownValues(selectedValue, valuesArray))
+        newValues = valuesArray.filter(a => a != Number(selectedValue));
+    parentCheckBox.checked = false;
+    setDropDownValue(element, newValues);
+
+}
+function onChangeChildrenCheckBox(element, subCheckBoxes, parentCheckBox) {
+    subCheckBoxes.forEach(item => {
+        item.onchange = function (e) {
+            let selected = e.target;
+            if (selected.checked)
+                onChildCheckboxChecked(element, selected.value, parentCheckBox, subCheckBoxes)
+            else
+                onChildCheckboxUnchecked(element, selected.value, parentCheckBox)
+        }
+    });
+}
+function singleSelectBehavior(ul, subMenu, element, title) {
+    onSelectItemSingleSelect(ul, subMenu, element, title);
+
+}
+function collapsingBehavior(li, subMenu) {
+    showOrHiddenElement(subMenu);
+    OnClickCollapsedParent(li, subMenu);
+}
+function multiSelectBehavior(element, parentCheckBox, subCheckBoxes) {
+    onChangeParentCheckBox(element, parentCheckBox, subCheckBoxes);
+    onChangeChildrenCheckBox(element, subCheckBoxes, parentCheckBox)
+}
+function onClickSelectAllBtns(btn, ul, ischecked, element) {
+    btn.onclick = function (e) {
+        let inputs = [...ul.getElementsByTagName("input")];
+        let checkBoxes = inputs.filter(a => a.type == "checkbox");
+        let newValues = [];
+        checkBoxes.forEach(item => {
+            item.checked = ischecked;
+            if (ischecked) {
+                if (!item.getAttribute("isParent"))
+                    newValues.push(Number(item.value));
+            }
+        
+        });
+        setDropDownValue(element, newValues);
+    }
+}
+function selectAllComponent(ul, element) {
+    let div = document.createElement("div");
+    div.id = `${element.id}_selectAll`;
+    let selectAllBtn = document.createElement("input");
+    selectAllBtn.value = "Select All";
+    selectAllBtn.type = "button";
+    let cancelAllBtn = document.createElement("input");
+    cancelAllBtn.value = "Cancel All ";
+    cancelAllBtn.type = "button";
+    onClickSelectAllBtns(selectAllBtn, ul, true, element);
+    onClickSelectAllBtns(cancelAllBtn, ul, false, element);
+    div.append(selectAllBtn, cancelAllBtn);
+    return div;
+}
+let normalDropDown = {
+    Element: "menuCountry",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME" ,
+    Type: "Normal",
+    IsSingleSelect: true,
+    IsCollapsed: false,
+    IsSearchable: false,
+    IsSelectAll: false,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(normalDropDown);
+let normalDropDownWithSearch = {
+    Element: "menuCountry2",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME",
+    Type: "Normal",
+    IsSingleSelect: true,
+    IsCollapsed: false,
+    IsSearchable: true,
+    IsSelectAll: false,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(normalDropDownWithSearch);
+
+let menuCountry3 = {
+    Element: "menuCountry3",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME",
+    IsSelectAll: false,
+    Type: "Normal",
+    IsSingleSelect: false,
+    IsCollapsed: true,
+    IsSearchable: true,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(menuCountry3);
+
+let menuCountry4 = {
+    Element: "menuCountry4",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME",
+    IsSelectAll: true,
+    Type: "Normal",
+    IsSingleSelect: false,
+    IsCollapsed: false,
+    IsSearchable: true,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(menuCountry4);
+
+
+let menuCountry5 = {
+    Element: "menuCountry5",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME" ,
+    IsSelectAll: true,
+    Type: "Normal",
+    IsSingleSelect: false,
+    IsCollapsed: true,
+    IsSearchable: true,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(menuCountry5);
+
+let menuCountry6 = {
+    Element: "menuCountry6",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME",
+    IsSelectAll: true,
+    Type: "Fixed",
+    IsSingleSelect: false,
+    IsCollapsed: true,
+    IsSearchable: true,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(menuCountry6);
+
+
+let menuCountry7 = {
+    Element: "menuCountry7",
+    Title: "Menu Country",
+    Url: "dropDownControl.aspx/GetCountries",
+    ParentValueColumn: "COUNTRYID",
+    ParentNameColumn: "COUNTRYNAME",
+    ChildValueColumn: "CITYID",
+    ChildNameColumn: "CITYNAME",
+    IsSelectAll: false,
+    Type: "Fixed",
+    IsSingleSelect: false,
+    IsCollapsed: false,
+    IsSearchable: true,
+    MenuStyle: {
+        borderTop: "1px solid black",
+        margin: "0px",
+        listStyle: "none inside",
+        padding: "0px",
+        maxHeight: "100px",
+        overflowY: "auto",
+    },
+    SubMenuStyle: {
+        listStyle: "none outside",
+        maxHeight: "100px",
+    }
+};
+drawDropDown(menuCountry7);
+
